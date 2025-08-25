@@ -68,7 +68,7 @@ def main_worker(gpu, ngpus_per_node, world_size):
             buffers = [optimizer.state[p].get("momentum_buffer", torch.zeros_like(p)) for p in params]
             buffers.extend([torch.empty_like(params[-1])] * (world_size - len(params) % world_size))
             for base_i in range(len(params))[::world_size]:
-                dist.gather(buffers[base_i + rank], gather_list=buffers[base_i:base_i + world_size])
+                dist.gather(buffers[base_i + rank], gather_list=buffers[base_i:base_i + world_size] if is_primary(rank) else None)
 
     optimizer.register_state_dict_pre_hook(gather)
 
