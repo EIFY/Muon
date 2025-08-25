@@ -12,9 +12,9 @@ def batch(size, dim):
     target = torch.randint(low=0, high=dim, size=(size,))
     return data, target
 
-def print_momentum_buffer(optimizer):
+def print_momentum_buffer(state_dict):
     print('momentum_buffer for parameter id:')
-    for parameter_id, s in optimizer.state_dict()['state'].items():
+    for parameter_id, s in state_dict['state'].items():
         print(f'{parameter_id}:', f'{s['momentum_buffer'].shape} tensor' if 'momentum_buffer' in s else None)
 
 def is_primary(rank):
@@ -60,7 +60,7 @@ def main_worker(gpu, ngpus_per_node, world_size):
     optimizer.zero_grad()
 
     if is_primary(rank):
-        print_momentum_buffer(optimizer)
+        print_momentum_buffer(optimizer.state_dict())
 
     def gather(optimizer):
         for group in optimizer.param_groups:
@@ -78,8 +78,9 @@ def main_worker(gpu, ngpus_per_node, world_size):
     optimizer.step()
     optimizer.zero_grad()
 
+    state_dict = optimizer.state_dict()
     if is_primary(rank):
-        print_momentum_buffer(optimizer)
+        print_momentum_buffer(state_dict)
 
 if __name__ == '__main__':
     main()
