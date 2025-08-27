@@ -60,6 +60,7 @@ def main_worker(gpu, ngpus_per_node, world_size):
     optimizer.zero_grad()
 
     if is_primary(rank):
+        print('Without state dict pre-hook to gather:')
         print_momentum_buffer(optimizer.state_dict())
 
     def gather(optimizer):
@@ -80,6 +81,7 @@ def main_worker(gpu, ngpus_per_node, world_size):
 
     state_dict = optimizer.state_dict()
     if is_primary(rank):
+        print('With state dict pre-hook to gather:')
         print_momentum_buffer(state_dict)
 
 if __name__ == '__main__':
