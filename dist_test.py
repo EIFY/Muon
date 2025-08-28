@@ -51,10 +51,10 @@ def main_worker(gpu, ngpus_per_node, world_size):
 
     model = torch.nn.parallel.DistributedDataParallel(model)
 
-    optimizer = Muon(model.parameters())
+    optimizer = Muon(list(model.parameters()))
 
     data, target = batch(1, dim)
-    loss = cross_entropy(model(data), target)
+    loss = cross_entropy(model(data.cuda()), target.cuda())
     loss.backward()
     optimizer.step()
     optimizer.zero_grad()
@@ -74,7 +74,7 @@ def main_worker(gpu, ngpus_per_node, world_size):
     optimizer.register_state_dict_pre_hook(gather)
 
     data, target = batch(1, dim)
-    loss = cross_entropy(model(data), target)
+    loss = cross_entropy(model(data.cuda()), target.cuda())
     loss.backward()
     optimizer.step()
     optimizer.zero_grad()
