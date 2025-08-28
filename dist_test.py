@@ -62,6 +62,7 @@ def main_worker(gpu, ngpus_per_node, world_size):
     if is_primary(rank):
         print('Without state dict pre-hook to gather:')
         print_momentum_buffer(optimizer.state_dict())
+        print()
 
     def gather(optimizer):
         for group in optimizer.param_groups:
@@ -71,7 +72,7 @@ def main_worker(gpu, ngpus_per_node, world_size):
             for base_i in range(len(params))[::world_size]:
                 dist.gather(buffers[base_i + rank], gather_list=buffers[base_i:base_i + world_size] if is_primary(rank) else None)
 
-    optimizer.register_state_dict_pre_hook(gather)
+    hook = optimizer.register_state_dict_pre_hook(gather)
 
     data, target = batch(1, dim)
     loss = cross_entropy(model(data.cuda()), target.cuda())
@@ -83,6 +84,35 @@ def main_worker(gpu, ngpus_per_node, world_size):
     if is_primary(rank):
         print('With state dict pre-hook to gather:')
         print_momentum_buffer(state_dict)
+        print()
+
+    hook.remove()
+
+    def actually_gather(optimizer):
+        for group in optimizer.param_groups:
+            params = group["params"]
+            assigned_b = optimizer.state[params[rank]]["momentum_buffer"]
+            buffer = None
+            if is_primary(rank):
+                buffer = [optimizer.state[p].get("momentum_buffer", torch.zeros_like(p)) for p in params]
+            dist.gather(assigned_b, gather_list=buffer)
+            if is_primary(rank):
+                for p, b in zip(params, buffer):
+                    optimizer.state[p]["momentum_buffer"] = b
+
+    hook = optimizer.register_state_dict_pre_hook(actually_gather)
+
+    data, target = batch(1, dim)
+    loss = cross_entropy(model(data.cuda()), target.cuda())
+    loss.backward()
+    optimizer.step()
+    optimizer.zero_grad()
+
+    state_dict = optimizer.state_dict()
+    if is_primary(rank):
+        print('With state dict pre-hook to actually gather:')
+        print_momentum_buffer(state_dict)
+        print()
 
 if __name__ == '__main__':
     main()
