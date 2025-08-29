@@ -126,6 +126,7 @@ def main_worker(gpu, ngpus_per_node, world_size):
         print()
         compare_params(init_data, model.parameters())
         print()
+    dist.destroy_process_group()
 
 if __name__ == '__main__':
     main()
