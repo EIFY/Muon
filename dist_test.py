@@ -20,6 +20,11 @@ def print_momentum_buffer(state_dict):
 def is_primary(rank):
     return not rank
 
+def compare_params(init_data, params):
+    for i, (init_d, p) in enumerate(zip(init_data, params)):
+        if torch.equal(init_d, p.data):
+            print('Parameter id', i, 'unchanged since init!')
+
 def main():
 
     world_size = int(os.environ.get("WORLD_SIZE", 1))
@@ -52,6 +57,8 @@ def main_worker(gpu, ngpus_per_node, world_size):
     model = torch.nn.parallel.DistributedDataParallel(model)
 
     optimizer = Muon(list(model.parameters()))
+    if is_primary(rank):
+        init_data = [p.data.clone() for p in model.parameters()]
 
     data, target = batch(1, dim)
     loss = cross_entropy(model(data.cuda()), target.cuda())
@@ -62,6 +69,8 @@ def main_worker(gpu, ngpus_per_node, world_size):
     if is_primary(rank):
         print('Without state dict pre-hook to gather:')
         print_momentum_buffer(optimizer.state_dict())
+        print()
+        compare_params(init_data, model.parameters())
         print()
 
     def gather(optimizer):
@@ -84,6 +93,8 @@ def main_worker(gpu, ngpus_per_node, world_size):
     if is_primary(rank):
         print('With state dict pre-hook to gather:')
         print_momentum_buffer(state_dict)
+        print()
+        compare_params(init_data, model.parameters())
         print()
 
     hook.remove()
@@ -112,6 +123,8 @@ def main_worker(gpu, ngpus_per_node, world_size):
     if is_primary(rank):
         print('With state dict pre-hook to actually gather:')
         print_momentum_buffer(state_dict)
+        print()
+        compare_params(init_data, model.parameters())
         print()
 
 if __name__ == '__main__':
